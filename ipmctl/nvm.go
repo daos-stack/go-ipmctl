@@ -40,6 +40,7 @@ import "C"
 
 import (
 	"fmt"
+	"unsafe"
 )
 
 //TEST_F(NvmApi_Tests, GetDeviceStatus)
@@ -57,7 +58,20 @@ import (
 func GetNumDevices() error {
 	var count C.uint
 	C.nvm_get_number_of_devices(&count)
+	var ddPtr *C.struct_device_discovery
+	//ds := [1 << 30]C.struct_device_discovery{}
+	// ddsPtr1 := &dds[1]
+	// defer C.free(unsafe.Pointer(ddsPtr1))
+	// ddsPtr := &dds
+	C.nvm_get_devices(ddPtr, C.NVM_UINT8(count))
+	defer C.free(unsafe.Pointer(ddPtr))
 	println(count)
+	if count > 0 {
+		deviceSlice := (*[1 << 30]C.struct_device_discovery)(unsafe.Pointer(ddPtr))[:count:count]
+	// device_discovery *p_devices = (device_discovery *)malloc(sizeof(device_discovery) * dimm_cnt);
+//  nvm_get_devices(p_devices, dimm_cnt);
+		fmt.Printf("%v", deviceSlice)
+	}
 
 	return nil
 }
