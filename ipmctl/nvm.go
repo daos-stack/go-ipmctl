@@ -55,23 +55,76 @@ import (
 //  free(p_devices);
 //}
 
+type DeviceDiscovery struct {
+	All_properties_populated uint8
+	Pad_cgo_0                [3]byte
+	Device_handle            [4]byte
+	Physical_id              uint16
+	Vendor_id                uint16
+	Device_id                uint16
+	Revision_id              uint16
+	Channel_pos              uint16
+	Channel_id               uint16
+	Memory_controller_id     uint16
+	Socket_id                uint16
+	Node_controller_id       uint16
+	Pad_cgo_1                [2]byte
+	Memory_type              uint32
+	Dimm_sku                 uint32
+	Manufacturer             [2]uint8
+	Serial_number            [4]uint8
+	Subsystem_vendor_id      uint16
+	Subsystem_device_id      uint16
+	Subsystem_revision_id    uint16
+	Manufacturing_info_valid uint8
+	Manufacturing_location   uint8
+	Manufacturing_date       uint16
+	Part_number              [21]int8
+	Fw_revision              [25]int8
+	Fw_api_version           [25]int8
+	Pad_cgo_2                [5]byte
+	Capacity                 uint64
+	Interface_format_codes   [9]uint16
+	Security_capabilities    _Ctype_struct_device_security_capabilities
+	Device_capabilities      _Ctype_struct_device_capabilities
+	Uid                      [22]int8
+	Lock_state               uint32
+	Manageability            uint32
+	Controller_revision_id   uint16
+	Reserved                 [48]uint8
+	Pad_cgo_3                [6]byte
+}
+
 func GetNumDevices() error {
 	var count C.uint
 	C.nvm_get_number_of_devices(&count)
-	var ddPtr *C.struct_device_discovery
-	//ds := [1 << 30]C.struct_device_discovery{}
-	// ddsPtr1 := &dds[1]
-	// defer C.free(unsafe.Pointer(ddsPtr1))
-	// ddsPtr := &dds
-	C.nvm_get_devices(ddPtr, C.NVM_UINT8(count))
-	defer C.free(unsafe.Pointer(ddPtr))
-	println(count)
-	if count > 0 {
-		deviceSlice := (*[1 << 30]C.struct_device_discovery)(unsafe.Pointer(ddPtr))[:count:count]
-	// device_discovery *p_devices = (device_discovery *)malloc(sizeof(device_discovery) * dimm_cnt);
-//  nvm_get_devices(p_devices, dimm_cnt);
-		fmt.Printf("%v", deviceSlice)
+	if count == 0 {
+		println("no NVDIMMs found!")
+		return nil
 	}
+
+	devs := make([]C.struct_device_discovery, int(count))
+	println(len(devs))
+
+	// don't need to defer free on devs as we allocated in go
+	C.nvm_get_devices(&devs[0], C.NVM_UINT8(count))
+	// defer C.free(unsafe.Pointer(&devs))
+
+	// cast struct array to slice of go equivalent struct
+	// (get equivalent go struct def from cgo -godefs)
+	deviceSlice := (*[1 << 30]DeviceDiscovery)(unsafe.Pointer(&devs[0]))[:count:count]
+	for i := 0; i < int(count); i++ {
+		//item := (*DeviceDiscovery)(unsafe.Pointer(&devs[i]))
+		d := deviceSlice[i]
+		fmt.Printf("Device ID: %d, Memory type: %d, Fw Rev: %v, Capacity %d, ",
+			d.Device_id, d.Memory_type, d.Fw_revision, d.Capacity)
+		fmt.Printf("Channel Pos: %d, Channel ID: %d, Memory Ctrlr: %d, Socket ID: %d.\n",
+			d.Channel_pos, d.Channel_id, d.Memory_controller_id, d.Socket_id)
+	}
+
+	fmt.Printf("%s\n", C.GoString((*C.char)(unsafe.Pointer(&devs[0].uid))))
+	status := C.struct_device_status{}
+	C.nvm_get_device_status((*C.char)(unsafe.Pointer(&devs[0].uid)), &status)
 
 	return nil
 }
