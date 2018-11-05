@@ -50,7 +50,7 @@ func TestNvm(t *testing.T) {
 	}
 
 	for _, _ = range tests {
-		if err := GetNumDevices(); err != nil {
+		if err := GetDevices(); err != nil {
 			t.Fatal(err.Error())
 		}
 	}

@@ -55,6 +55,8 @@ import (
 //  free(p_devices);
 //}
 
+// DeviceDiscovery struct represents Go equivalent of C.struct_device_discovery
+// from nvm_management.h (NVM API) as reported by "go tool cgo -godefs nvm.go"
 type DeviceDiscovery struct {
 	All_properties_populated uint8
 	Pad_cgo_0                [3]byte
@@ -95,7 +97,9 @@ type DeviceDiscovery struct {
 	Pad_cgo_3                [6]byte
 }
 
-func GetNumDevices() error {
+// GetDevices queries number of NVDIMMS and retrieves device_discovery structs
+// for each.
+func GetDevices() error {
 	var count C.uint
 	C.nvm_get_number_of_devices(&count)
 	if count == 0 {
@@ -125,6 +129,19 @@ func GetNumDevices() error {
 	fmt.Printf("%s\n", C.GoString((*C.char)(unsafe.Pointer(&devs[0].uid))))
 	status := C.struct_device_status{}
 	C.nvm_get_device_status((*C.char)(unsafe.Pointer(&devs[0].uid)), &status)
+
+	uidCharPtr := (*C.char)(unsafe.Pointer(&devs[0].uid))
+
+    //status := C.struct_device_status{}
+    //C.nvm_get_device_status(uidCharPtr, &status)
+
+	// verify api call passing in uid as param
+    dev := C.struct_device_discovery{}
+    C.nvm_get_device_discovery(uidCharPtr, &dev)
+    dd := (*DeviceDiscovery)(unsafe.Pointer(&dev))
+    fmt.Printf("Device ID: %d, Memory type: %d, Fw Rev: %v, Capacity %d, ",
+               dd.Device_id, dd.Memory_type, dd.Fw_revision, dd.Capacity)
+
 
 	return nil
 }
