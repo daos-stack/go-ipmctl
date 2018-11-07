@@ -55,109 +55,87 @@ import (
 //  free(p_devices);
 //}
 
-// DeviceDiscovery struct represents Go equivalent of C.struct_device_discovery
-// from nvm_management.h (NVM API) as reported by "go tool cgo -godefs nvm.go"
-type DeviceDiscovery struct {
-	All_properties_populated uint8
-	Pad_cgo_0                [3]byte
-	Device_handle            [4]byte
-	Physical_id              uint16
-	Vendor_id                uint16
-	Device_id                uint16
-	Revision_id              uint16
-	Channel_pos              uint16
-	Channel_id               uint16
-	Memory_controller_id     uint16
-	Socket_id                uint16
-	Node_controller_id       uint16
-	Pad_cgo_1                [2]byte
-	Memory_type              uint32
-	Dimm_sku                 uint32
-	Manufacturer             [2]uint8
-	Serial_number            [4]uint8
-	Subsystem_vendor_id      uint16
-	Subsystem_device_id      uint16
-	Subsystem_revision_id    uint16
-	Manufacturing_info_valid uint8
-	Manufacturing_location   uint8
-	Manufacturing_date       uint16
-	Part_number              [21]int8
-	Fw_revision              [25]int8
-	Fw_api_version           [25]int8
-	Pad_cgo_2                [5]byte
-	Capacity                 uint64
-	Interface_format_codes   [9]uint16
-	Security_capabilities    _Ctype_struct_device_security_capabilities
-	Device_capabilities      _Ctype_struct_device_capabilities
-	Uid                      [22]int8
-	Lock_state               uint32
-	Manageability            uint32
-	Controller_revision_id   uint16
-	Reserved                 [48]uint8
-	Pad_cgo_3                [6]byte
-}
+// NvmMgmt is an implementation of the IpmCtl interface which exercises
+// libipmctl's NVM API.
+type NvmMgmt struct{}
 
-// GetDevices queries number of NVDIMMS and retrieves device_discovery structs
+// Discover queries number of SCM modules and retrieves device_discovery structs
 // for each.
-func GetDevices() error {
+func (n *NvmMgmt) Discover() (devices []DeviceDiscovery, err error) {
 	var count C.uint
-	C.nvm_get_number_of_devices(&count)
+	if err = Rc2err(
+		"get_number_of_devices",
+		C.nvm_get_number_of_devices(&count)); err != nil {
+		return
+	}
 	if count == 0 {
 		println("no NVDIMMs found!")
-		return nil
+		return
 	}
 
 	devs := make([]C.struct_device_discovery, int(count))
-	println(len(devs))
+	// println(len(devs))
 
 	// don't need to defer free on devs as we allocated in go
-	C.nvm_get_devices(&devs[0], C.NVM_UINT8(count))
+	if err = Rc2err(
+		"get_devices",
+		C.nvm_get_devices(&devs[0], C.NVM_UINT8(count))); err != nil {
+		return
+	}
 	// defer C.free(unsafe.Pointer(&devs))
 
 	// cast struct array to slice of go equivalent struct
 	// (get equivalent go struct def from cgo -godefs)
-	deviceSlice := (*[1 << 30]DeviceDiscovery)(unsafe.Pointer(&devs[0]))[:count:count]
-	for i := 0; i < int(count); i++ {
-		//item := (*DeviceDiscovery)(unsafe.Pointer(&devs[i]))
-		d := deviceSlice[i]
+	devices = (*[1 << 30]DeviceDiscovery)(unsafe.Pointer(&devs[0]))[:count:count]
+	if len(devices) != int(count) {
+		err = fmt.Errorf("expected %d devices but got %d", len(devices), int(count))
+	}
+
+	return
+}
+
+// GetStatuses return status for each device in devices
+func (n *NvmMgmt) GetStatuses(devices []DeviceDiscovery) (
+	statuses []DeviceStatus, err error) {
+
+	// printing for debug
+	for i, d := range devices {
 		fmt.Printf("Device ID: %d, Memory type: %d, Fw Rev: %v, Capacity %d, ",
 			d.Device_id, d.Memory_type, d.Fw_revision, d.Capacity)
 		fmt.Printf("Channel Pos: %d, Channel ID: %d, Memory Ctrlr: %d, Socket ID: %d.\n",
 			d.Channel_pos, d.Channel_id, d.Memory_controller_id, d.Socket_id)
+
+		uidCharPtr := (*C.char)(unsafe.Pointer(&devices[0].Uid))
+		//uidCharPtr := (*C.char)(unsafe.Pointer(&devs[0].uid))
+
+		fmt.Printf("uid of device %i: %s\n", i, C.GoString(uidCharPtr))
+
+		status := C.struct_device_status{}
+		if err = Rc2err(
+			"get_device_status",
+			C.nvm_get_device_status(uidCharPtr, &status)); err != nil {
+			return
+		}
+		statuses = append(statuses, *(*DeviceStatus)(unsafe.Pointer(&status)))
 	}
 
-	fmt.Printf("%s\n", C.GoString((*C.char)(unsafe.Pointer(&devs[0].uid))))
-	status := C.struct_device_status{}
-	C.nvm_get_device_status((*C.char)(unsafe.Pointer(&devs[0].uid)), &status)
-
-	uidCharPtr := (*C.char)(unsafe.Pointer(&devs[0].uid))
-
-    //status := C.struct_device_status{}
-    //C.nvm_get_device_status(uidCharPtr, &status)
-
 	// verify api call passing in uid as param
-    dev := C.struct_device_discovery{}
-    C.nvm_get_device_discovery(uidCharPtr, &dev)
-    dd := (*DeviceDiscovery)(unsafe.Pointer(&dev))
-    fmt.Printf("Device ID: %d, Memory type: %d, Fw Rev: %v, Capacity %d, ",
-               dd.Device_id, dd.Memory_type, dd.Fw_revision, dd.Capacity)
+	// dev := C.struct_device_discovery{}
+	// C.nvm_get_device_discovery(uidCharPtr, &dev)
+	// dd := (*DeviceDiscovery)(unsafe.Pointer(&dev))
+	// fmt.Printf("Device ID: %d, Memory type: %d, Fw Rev: %v, Capacity %d, ",
+	//    dd.Device_id, dd.Memory_type, dd.Fw_revision, dd.Capacity)
 
-
-	return nil
+	return
 }
 
-// Rc2err returns an failure if rc != 0.
+// Rc2err returns an failure if rc != NVM_SUCCESS.
 //
-// TODO: If err is already set then it is wrapped,
-// otherwise it is ignored. e.g.
-// func Rc2err(label string, rc C.int, err error) error {
+// TODO: print human readable error with provided lib macros
 func Rc2err(label string, rc C.int) error {
-	if rc != 0 {
-		if rc < 0 {
-			rc = -rc
-		}
-		// e := errors.Error(rc)
-		return fmt.Errorf("%s: %s", label, rc) // e
+	if rc != C.NVM_SUCCESS {
+		// e := errors.Error(C.NVDIMM_ERR_W(FORMAT_STR_NL, rc))
+		return fmt.Errorf("%s: rc=%d", label, int(rc)) // e
 	}
 	return nil
 }
