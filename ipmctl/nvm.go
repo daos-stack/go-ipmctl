@@ -43,17 +43,18 @@ import (
 	"unsafe"
 )
 
-//TEST_F(NvmApi_Tests, GetDeviceStatus)
-//{
-//  unsigned int dimm_cnt = 0;
-//  nvm_get_number_of_devices(&dimm_cnt);
-//  device_discovery *p_devices = (device_discovery *)malloc(sizeof(device_discovery) * dimm_cnt);
-//  nvm_get_devices(p_devices, dimm_cnt);
-//  device_status *p_status = (device_status *)malloc(sizeof(device_status));
-//  EXPECT_EQ(nvm_get_device_status(p_devices->uid, p_status), NVM_SUCCESS);
-//  free(p_status);
-//  free(p_devices);
-//}
+// IpmCtl is the interface that provides access to libipmctl.
+type IpmCtl interface {
+	// SetInterleaved mode for app-direct regions
+	// process referred to as "set goal" in NVM API
+	//SetRegion(...)
+	// Discover persistent memory modules
+	Discover() ([]DeviceDiscovery, error)
+	// Update persistent memory module firmware
+	//Update(...)
+	// Cleanup persistent memory references
+	//Cleanup()
+}
 
 // NvmMgmt is an implementation of the IpmCtl interface which exercises
 // libipmctl's NVM API.
@@ -139,3 +140,16 @@ func Rc2err(label string, rc C.int) error {
 	}
 	return nil
 }
+
+// example unit test from NVM API source
+//TEST_F(NvmApi_Tests, GetDeviceStatus)
+//{
+//  unsigned int dimm_cnt = 0;
+//  nvm_get_number_of_devices(&dimm_cnt);
+//  device_discovery *p_devices = (device_discovery *)malloc(sizeof(device_discovery) * dimm_cnt);
+//  nvm_get_devices(p_devices, dimm_cnt);
+//  device_status *p_status = (device_status *)malloc(sizeof(device_status));
+//  EXPECT_EQ(nvm_get_device_status(p_devices->uid, p_status), NVM_SUCCESS);
+//  free(p_status);
+//  free(p_devices);
+//}
