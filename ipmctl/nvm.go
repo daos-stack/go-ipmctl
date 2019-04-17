@@ -109,7 +109,7 @@ func (n *NvmMgmt) GetStatuses(devices []DeviceDiscovery) (
 		uidCharPtr := (*C.char)(unsafe.Pointer(&devices[0].Uid))
 		//uidCharPtr := (*C.char)(unsafe.Pointer(&devs[0].uid))
 
-		fmt.Printf("uid of device %i: %s\n", i, C.GoString(uidCharPtr))
+		fmt.Printf("uid of device %d: %s\n", i, C.GoString(uidCharPtr))
 
 		status := C.struct_device_status{}
 		if err = Rc2err(
