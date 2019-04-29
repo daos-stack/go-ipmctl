@@ -11,7 +11,7 @@ tasks:
     cmds:
       - go test -v
 
-  build-spdk:
+  build-go-ipmctl:
     dir: ipmctl
     deps: [lint]
     cmds:

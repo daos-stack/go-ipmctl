@@ -2,13 +2,13 @@
 
 Go bindings for the libipmctl native C lib to enable management of DCPMMs from Go source 
 
-This is a Go interface for [ipmctl](https://github.com/intel/ipmctl) which is also a work in progress.
+This is a Go interface for [ipmctl](https://github.com/intel/ipmctl)
 
 ## How to Build
 
 This is a [Go](https://golang.orghttps://golang.org/doc/install)
 project, so the Go development tools are naturally required. We
-recommend the most current Go release available. As of July 2018, the project has been built and tested with Go 1.9.
+recommend the most current Go release available. As of July 2018, the project has been built and tested with Go 1.11.5
 
 The following steps assume ipmctl library is installed. To install please follow steps in the [ipmctl github](https://github.com/intel/ipmctl)
 
