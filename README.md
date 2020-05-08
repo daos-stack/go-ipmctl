@@ -1,3 +1,7 @@
+# NOTICE -- This repo is deprecated!
+
+Please use https://github.com/daos-stack/daos/tree/master/src/control/lib/ipmctl instead.
+
 # Go language bindings for the ipmctl API for managing PMMs
 
 Go bindings for the libipmctl native C lib to enable management of DCPMMs from Go source 
